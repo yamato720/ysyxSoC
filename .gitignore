@@ -1,2 +1,7 @@
 build/
 out/
+.bloop/
+.bsp/
+.metals/
+build-sim/
+patch/firtool/

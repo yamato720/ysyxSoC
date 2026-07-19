@@ -10,6 +10,9 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.amba.axi4._
 import freechips.rocketchip.amba.apb._
 import freechips.rocketchip.system.SimAXIMem
+import _root_.scpu.ISAConfig
+import _root_.scpu.protocol.{ArithmeticAssistPort, NpcDispatchControlPort}
+import ysyx.YsyxPlatformParameters
 
 object AXI4SlaveNodeGenerator {
   def apply(params: Option[MasterPortParams], address: Seq[AddressSet])(implicit valName: ValName) =
@@ -24,36 +27,58 @@ object AXI4SlaveNodeGenerator {
 }
 
 class ysyxSoCASIC(implicit p: Parameters) extends LazyModule {
+  private val npcConfig = YsyxPlatformParameters.npcCoreConfig
+  private val useDpiSimBackend = YsyxPlatformParameters.isDpiSimulation
+  private val useFpgaBackend = YsyxPlatformParameters.isFpga
   val xbar = AXI4Xbar()
   val xbar2 = AXI4Xbar()
   val apbxbar = LazyModule(new APBFanout).node
   val cpu = LazyModule(new CPU(idBits = ChipLinkParam.idBits))
-  val chipMaster = if (Config.hasChipLink) Some(LazyModule(new ChipLinkMaster)) else None
-  val chiplinkNode = if (Config.hasChipLink) Some(AXI4SlaveNodeGenerator(p(ExtBus), ChipLinkParam.allSpace)) else None
+  val chipMaster = if (YsyxPlatformParameters.hasChipLink) Some(LazyModule(new ChipLinkMaster)) else None
+  val chiplinkNode = if (YsyxPlatformParameters.hasChipLink) Some(AXI4SlaveNodeGenerator(p(ExtBus), ChipLinkParam.allSpace)) else None
 
-  val luart = LazyModule(new APBUart16550(AddressSet.misaligned(0x10000000, 0x1000)))
-  val lgpio = LazyModule(new APBGPIO(AddressSet.misaligned(0x10002000, 0x10)))
-  val lkeyboard = LazyModule(new APBKeyboard(AddressSet.misaligned(0x10011000, 0x8)))
-  val lvga = LazyModule(new APBVGA(AddressSet.misaligned(0x21000000, 0x200000)))
-  val lspi  = LazyModule(new APBSPI(
+  val luart = if (useFpgaBackend) None else Some(LazyModule(new APBUart16550(AddressSet.misaligned(0x10000000, 0x1000))))
+  val lgpio = if (useFpgaBackend) None else Some(LazyModule(new APBGPIO(AddressSet.misaligned(0x10002000, 0x10))))
+  val lkeyboard = if (useFpgaBackend) None else Some(LazyModule(new APBKeyboard(AddressSet.misaligned(0x10011000, 0x8))))
+  val lvga = if (useFpgaBackend) None else Some(LazyModule(new APBVGA(AddressSet.misaligned(0x21000000, 0x200000))))
+  val lspi = if (useFpgaBackend) None else Some(LazyModule(new APBSPI(
     AddressSet.misaligned(0x10001000, 0x1000) ++    // SPI controller
     AddressSet.misaligned(0x30000000, 0x10000000)   // XIP flash
-  ))
-  val lpsram = LazyModule(new APBPSRAM(AddressSet.misaligned(0x80000000L, 0x400000)))
-  val lmrom = LazyModule(new AXI4MROM(AddressSet.misaligned(0x20000000, 0x1000)))
+  )))
+  val lpsram = if (useDpiSimBackend || useFpgaBackend) None else
+    Some(LazyModule(new APBPSRAM(AddressSet.misaligned(0x80000000L, 0x400000))))
+  // Match NEMU's 128 MiB physical-memory window in simulation mode.
+  val lsimPmem = if (useDpiSimBackend) Some(LazyModule(new APBDpiRam(AddressSet.misaligned(0x80000000L, 0x08000000)))) else None
+  // NEMU's device ABI occupies this window. It deliberately replaces SDRAM
+  // only in simulation, because their address maps overlap.
+  val lsimMmio = if (useDpiSimBackend) Some(LazyModule(new APBDpiMmio(AddressSet.misaligned(0xa0000000L, 0x02000000)))) else None
+  val lmrom = if (useFpgaBackend) None else
+    Some(LazyModule(new AXI4MROM(AddressSet.misaligned(0x20000000, 0x1000))))
   val sramNode = AXI4RAM(AddressSet.misaligned(0x0f000000, 0x2000).head, false, true, 4, None, Nil, false)
+  val fpgaMemoryNode = if (useFpgaBackend) Some(AXI4SlaveNodeGenerator(
+    p(ExtBus), AddressSet.misaligned(npcConfig.memory.mainMemoryBase, npcConfig.memory.mainMemorySize)
+  )) else None
 
   val sdramAddressSet = AddressSet.misaligned(0xa0000000L, 0x2000000)
-  val lsdram_apb = if (!Config.sdramUseAXI) Some(LazyModule(new APBSDRAM (sdramAddressSet))) else None
-  val lsdram_axi = if ( Config.sdramUseAXI) Some(LazyModule(new AXI4SDRAM(sdramAddressSet))) else None
+  val lsdram_apb = if (!useDpiSimBackend && !useFpgaBackend && !YsyxPlatformParameters.useAxiSdram) Some(LazyModule(new APBSDRAM(sdramAddressSet))) else None
+  val lsdram_axi = if (!useDpiSimBackend && !useFpgaBackend && YsyxPlatformParameters.useAxiSdram) Some(LazyModule(new AXI4SDRAM(sdramAddressSet))) else None
 
-  List(lspi.node, luart.node, lpsram.node, lgpio.node, lkeyboard.node, lvga.node).map(_ := apbxbar)
-  List(apbxbar := APBDelayer() := AXI4ToAPB() := AXI4Buffer(), lmrom.node, sramNode).map(_ := xbar2)
+  (lspi.map(_.node) ++ luart.map(_.node) ++ lgpio.map(_.node) ++
+    lkeyboard.map(_.node) ++ lvga.map(_.node) ++ lpsram.map(_.node) ++
+    lsimPmem.map(_.node) ++ lsimMmio.map(_.node)).map(_ := apbxbar)
+  if (!useFpgaBackend) apbxbar := APBDelayer() := AXI4ToAPB() := AXI4Buffer() := xbar2
+  (lmrom.map(_.node).toSeq :+ sramNode).map(_ := xbar2)
   xbar2 := AXI4UserYanker(Some(1)) := AXI4Fragmenter() := xbar
-  if (Config.sdramUseAXI) lsdram_axi.get.node := ysyx.AXI4Delayer() := xbar
-  else                    lsdram_apb.get.node := apbxbar
-  if (Config.hasChipLink) chiplinkNode.get := xbar
+  if (!useDpiSimBackend && !useFpgaBackend) {
+    if (YsyxPlatformParameters.useAxiSdram) lsdram_axi.get.node := ysyx.AXI4Delayer() := xbar
+    else                    lsdram_apb.get.node := apbxbar
+  }
+  fpgaMemoryNode.foreach { node => node := AXI4Buffer() := xbar }
+  if (YsyxPlatformParameters.hasChipLink) chiplinkNode.get := xbar
   xbar := cpu.masterNode
+  val fpgaMemory = InModuleBody {
+    if (useFpgaBackend) fpgaMemoryNode.get.makeIOs() else Seq.empty
+  }
 
   override lazy val module = new Impl
   class Impl extends LazyModuleImp(this) with DontTouch {
@@ -61,8 +86,8 @@ class ysyxSoCASIC(implicit p: Parameters) extends LazyModule {
     // to initialize some async modules before accept any requests from cpu
     cpu.module.reset := SynchronizerShiftReg(reset.asBool, 10) || reset.asBool
 
-    val fpga_io = if (Config.hasChipLink) Some(IO(chiselTypeOf(chipMaster.get.module.fpga_io))) else None
-    if (Config.hasChipLink) {
+    val fpga_io = if (YsyxPlatformParameters.hasChipLink) Some(IO(chiselTypeOf(chipMaster.get.module.fpga_io))) else None
+    if (YsyxPlatformParameters.hasChipLink) {
       // connect chiplink slave interface to crossbar
       (chipMaster.get.slave zip chiplinkNode.get.in) foreach { case (io, (bundle, _)) => io <> bundle }
 
@@ -78,25 +103,46 @@ class ysyxSoCASIC(implicit p: Parameters) extends LazyModule {
     // connect interrupt signal to cpu
     val intr_from_chipSlave = IO(Input(Bool()))
     cpu.module.interrupt := intr_from_chipSlave
+    val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
+    val putch = if (useFpgaBackend) Some(IO(Decoupled(UInt(8.W)))) else None
+    val arithmeticAssist = if (useFpgaBackend && npcConfig.isa.F) {
+      Some(IO(new ArithmeticAssistPort(32)))
+    } else None
+    val dispatchControl = if (useFpgaBackend) Some(IO(new NpcDispatchControlPort)) else None
+    debug.foreach(_ := cpu.module.debug.get)
+    (putch zip cpu.module.putch).foreach { case (external, source) => external <> source }
+    (arithmeticAssist zip cpu.module.arithmeticAssist).foreach { case (external, source) =>
+      external.request.valid := source.request.valid
+      external.request.bits := source.request.bits
+      source.request.ready := external.request.ready
+      source.response.valid := external.response.valid
+      source.response.bits := external.response.bits
+      external.response.ready := source.response.ready
+      external.busy := source.busy
+    }
+    (dispatchControl zip cpu.module.dispatchControl).foreach { case (external, core) =>
+      core.dispatchPermit := external.dispatchPermit
+      external.dispatchFire := core.dispatchFire
+    }
 
-    val sdramBundle = if (Config.sdramUseAXI) lsdram_axi.get.module.sdram_bundle
-                      else                    lsdram_apb.get.module.sdram_bundle
+    val sdramBundle = if (YsyxPlatformParameters.useAxiSdram) lsdram_axi.map(_.module.sdram_bundle)
+                      else                    lsdram_apb.map(_.module.sdram_bundle)
 
     // expose slave I/O interface as ports
-    val spi = IO(chiselTypeOf(lspi.module.spi_bundle))
-    val uart = IO(chiselTypeOf(luart.module.uart))
-    val psram = IO(chiselTypeOf(lpsram.module.qspi_bundle))
-    val sdram = IO(chiselTypeOf(sdramBundle))
-    val gpio = IO(chiselTypeOf(lgpio.module.gpio_bundle))
-    val ps2 = IO(chiselTypeOf(lkeyboard.module.ps2_bundle))
-    val vga = IO(chiselTypeOf(lvga.module.vga_bundle))
-    uart <> luart.module.uart
-    spi <> lspi.module.spi_bundle
-    psram <> lpsram.module.qspi_bundle
-    sdram <> sdramBundle
-    gpio <> lgpio.module.gpio_bundle
-    ps2 <> lkeyboard.module.ps2_bundle
-    vga <> lvga.module.vga_bundle
+    val spi = lspi.map(device => IO(chiselTypeOf(device.module.spi_bundle)))
+    val uart = luart.map(device => IO(chiselTypeOf(device.module.uart)))
+    val psram = lpsram.map(device => IO(chiselTypeOf(device.module.qspi_bundle)))
+    val sdram = sdramBundle.map(bundle => IO(chiselTypeOf(bundle)))
+    val gpio = lgpio.map(device => IO(chiselTypeOf(device.module.gpio_bundle)))
+    val ps2 = lkeyboard.map(device => IO(chiselTypeOf(device.module.ps2_bundle)))
+    val vga = lvga.map(device => IO(chiselTypeOf(device.module.vga_bundle)))
+    (uart zip luart).foreach { case (io, device) => io <> device.module.uart }
+    (spi zip lspi).foreach { case (io, device) => io <> device.module.spi_bundle }
+    (psram zip lpsram).foreach { case (io, device) => io <> device.module.qspi_bundle }
+    (sdram zip sdramBundle).foreach { case (io, bundle) => io <> bundle }
+    (gpio zip lgpio).foreach { case (io, device) => io <> device.module.gpio_bundle }
+    (ps2 zip lkeyboard).foreach { case (io, device) => io <> device.module.ps2_bundle }
+    (vga zip lvga).foreach { case (io, device) => io <> device.module.vga_bundle }
   }
 }
 
@@ -110,8 +156,10 @@ class ysyxSoCFull(implicit p: Parameters) extends LazyModule {
   override lazy val module = new Impl
   class Impl extends LazyModuleImp(this) with DontTouch {
     val masic = asic.module
+    val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
+    (debug zip masic.debug).foreach { case (trace, source) => trace := source }
 
-    if (Config.hasChipLink) {
+    if (YsyxPlatformParameters.hasChipLink) {
       val fpga = LazyModule(new ysyxSoCFPGA)
       val mfpga = Module(fpga.module)
       masic.dontTouchPorts()
@@ -132,28 +180,36 @@ class ysyxSoCFull(implicit p: Parameters) extends LazyModule {
 
     masic.intr_from_chipSlave := false.B
 
-    val flash = Module(new flash)
-    flash.io <> masic.spi
-    flash.io.ss := masic.spi.ss(0)
-    val bitrev = Module(new bitrev)
-    bitrev.io <> masic.spi
-    bitrev.io.ss := masic.spi.ss(7)
-    masic.spi.miso := List(bitrev.io, flash.io).map(_.miso).reduce(_&&_)
+    masic.spi.foreach { spiPort =>
+      val flash = Module(new flash)
+      flash.io <> spiPort
+      flash.io.ss := spiPort.ss(0)
+      val bitrev = Module(new bitrev)
+      bitrev.io <> spiPort
+      bitrev.io.ss := spiPort.ss(7)
+      spiPort.miso := List(bitrev.io, flash.io).map(_.miso).reduce(_&&_)
+    }
 
-    val psram = Module(new psram)
-    psram.io <> masic.psram
-    val sdram = Module(new sdram)
-    sdram.io <> masic.sdram
+    masic.psram.foreach { psramPort =>
+      val psram = Module(new psram)
+      psram.io <> psramPort
+    }
+    masic.sdram.foreach { sdramPort =>
+      val sdram = Module(new sdram)
+      sdram.io <> sdramPort
+    }
 
-    val externalPins = IO(new Bundle{
-      val gpio = chiselTypeOf(masic.gpio)
-      val ps2 = chiselTypeOf(masic.ps2)
-      val vga = chiselTypeOf(masic.vga)
-      val uart = chiselTypeOf(masic.uart)
-    })
-    externalPins.gpio <> masic.gpio
-    externalPins.ps2 <> masic.ps2
-    externalPins.vga <> masic.vga
-    externalPins.uart <> masic.uart
+    val externalPins = if (YsyxPlatformParameters.isFpga) None else Some(IO(new Bundle{
+      val gpio = chiselTypeOf(masic.gpio.get)
+      val ps2 = chiselTypeOf(masic.ps2.get)
+      val vga = chiselTypeOf(masic.vga.get)
+      val uart = chiselTypeOf(masic.uart.get)
+    }))
+    externalPins.foreach { pins =>
+      pins.gpio <> masic.gpio.get
+      pins.ps2 <> masic.ps2.get
+      pins.vga <> masic.vga.get
+      pins.uart <> masic.uart.get
+    }
   }
 }

@@ -1,26 +1,40 @@
 package ysyx
 
 import chisel3._
-import org.chipsalliance.cde.config.{Parameters, Config}
+import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.system._
 import freechips.rocketchip.diplomacy.LazyModule
+import _root_.scpu.fpga.CdeConfigResolver
 
-object Config {
-  def hasChipLink: Boolean = false
-  def sdramUseAXI: Boolean = false
-}
+class ysyxSoCTop(implicit val parameters: Parameters) extends Module {
 
-class ysyxSoCTop extends Module {
-  implicit val config: Parameters = new Config(new Edge32BitConfig ++ new DefaultRV32Config)
-
-  val io = IO(new Bundle { })
   val dut = LazyModule(new ysyxSoCFull)
   val mdut = Module(dut.module)
   mdut.dontTouchPorts()
-  mdut.externalPins := DontCare
+  mdut.externalPins.get := DontCare
+
+  if (YsyxPlatformParameters.isDpiSimulation) {
+    val io = IO(new Bundle {
+      val debug = Output(NpcSoCDebugBundle())
+    })
+    io.debug := mdut.debug.get
+  } else {
+    val io = IO(new Bundle { })
+  }
 }
 
 object Elaborate extends App {
+  val (entry, construction) = CdeConfigResolver.resolve("YsyxStandaloneConfig", Set("soc"))
+  println(s"正在生成 ysyxSoC Verilog... Config=${entry.className}")
+  implicit val parameters: Parameters = construction
+  val firtoolOptions = Array("--disable-annotation-unknown")
+  circt.stage.ChiselStage.emitSystemVerilogFile(new ysyxSoCTop, args, firtoolOptions)
+}
+
+object ElaborateSim extends App {
+  val (entry, construction) = CdeConfigResolver.resolve("YsyxSimulationConfig", Set("soc"))
+  println(s"正在生成 ysyxSoC 仿真 Verilog... Config=${entry.className}")
+  implicit val parameters: Parameters = construction
   val firtoolOptions = Array("--disable-annotation-unknown")
   circt.stage.ChiselStage.emitSystemVerilogFile(new ysyxSoCTop, args, firtoolOptions)
 }

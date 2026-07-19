@@ -67,6 +67,7 @@ class AXI4ToAPB(val aFlow: Boolean = true)(implicit p: Parameters) extends LazyM
       val rid_reg    = RegEnable(ar.bits.id, accept_read)
       val bid_reg    = RegEnable(aw.bits.id, accept_write)
       val araddr_reg = ar.bits.addr holdUnless accept_read
+      val arsize_reg = ar.bits.size holdUnless accept_read
       val awaddr_reg = aw.bits.addr holdUnless accept_write
       val wdata_reg  =  w.bits.data holdUnless accept_write
       val wstrb_reg  =  w.bits.strb holdUnless accept_write
@@ -77,7 +78,14 @@ class AXI4ToAPB(val aFlow: Boolean = true)(implicit p: Parameters) extends LazyM
       out.paddr   := Mux(is_write, awaddr_reg, araddr_reg)
       out.pprot   := APBParameters.PROT_DEFAULT
       out.pwdata  := wdata_reg
-      out.pstrb   := Mux(is_write, wstrb_reg, 0.U)
+      // APB 对读传输不使用 PSTRB。这里保留 AXI ARSIZE，供仿真 DPI MMIO
+      // 后端恢复 NEMU 所需的访问长度；普通 APB 从设备会忽略它。
+      val readStrb = MuxLookup(arsize_reg, "b1111".U(4.W))(Seq(
+        0.U -> "b0001".U(4.W),
+        1.U -> "b0011".U(4.W),
+        2.U -> "b1111".U(4.W)
+      ))
+      out.pstrb   := Mux(is_write, wstrb_reg, readStrb)
 
       ar.ready := accept_read
       w.ready  := accept_write

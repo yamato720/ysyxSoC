@@ -82,6 +82,37 @@ trait ysyxSoCModule extends ScalaModule {
 object ysyxsoc extends ysyxSoC
 trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   override def millSourcePath = pwd
-  override def sources = Task.Sources(millSourcePath / "src")
+  // 将 NPC 核心与 FPGA 集成层编入同一个 BSP 目标，使 IDE 能解析 SoC wrapper
+  // 对 scpu.NpcCore 及 scpu.fpga 的引用。
+  private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "main" / "scala"
+  private val npcParameterSourcePath = millSourcePath / os.up / "configs" / "parameters"
+  private val npcConfigSourcePath = millSourcePath / os.up / "configs" / "npc"
+  private val ysyxParameterSourcePath = millSourcePath / os.up / "configs" / "platform"
+  private val ysyxConfigSourcePath = millSourcePath / os.up / "configs" / "ysyx"
+  private val fpgaConfigSourcePath = millSourcePath / os.up / "configs" / "fpga"
+  private val npcFpgaCommonSourcePath = millSourcePath / os.up / "fpga-harness" / "src" / "common"
+  private val npcFpgaCoreSourcePath = millSourcePath / os.up / "fpga-harness" / "src" / "rv-core"
+  private val npcFpgaSocSourcePath = millSourcePath / os.up / "fpga-harness" / "src" / "ysyxSoC"
+  // NPC 核心使用的 DPI BlackBox 从当前模块的 classpath 查找资源，因此这里同时
+  // 引入核心资源目录，保证 SoC 生成时仍能选择可选的 DPI 实现。
+  private val npcCoreResourcePath = millSourcePath / os.up / "rv-core" / "main" / "resources"
+  private val npcConfigResourcePath = millSourcePath / os.up / "configs" / "resources"
+  override def sources = Task.Sources(
+    millSourcePath / "src",
+    npcCoreSourcePath,
+    npcParameterSourcePath,
+    npcConfigSourcePath,
+    ysyxParameterSourcePath,
+    ysyxConfigSourcePath,
+    fpgaConfigSourcePath,
+    npcFpgaCommonSourcePath,
+    npcFpgaCoreSourcePath,
+    npcFpgaSocSourcePath
+  )
+  override def resources = Task.Sources(
+    millSourcePath / "src" / "main" / "resources",
+    npcCoreResourcePath,
+    npcConfigResourcePath
+  )
   def rocketModule = rocketchip
 }
