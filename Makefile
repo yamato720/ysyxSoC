@@ -57,7 +57,7 @@ ifneq ($(strip $(config)),)
   endif
 endif
 
-SOC_VERILOG_SCALA_CONFIG := $(if $(SOC_SELECTED_SCALA_CONFIG),$(SOC_SELECTED_SCALA_CONFIG),ysyx.YsyxStandaloneConfig)
+SOC_VERILOG_SCALA_CONFIG := $(if $(SOC_SELECTED_SCALA_CONFIG),$(SOC_SELECTED_SCALA_CONFIG),ysyx.YsyxElaborateConfig)
 SOC_SIM_SCALA_CONFIG := $(if $(SOC_SELECTED_SCALA_CONFIG),$(SOC_SELECTED_SCALA_CONFIG),ysyx.YsyxSimulationConfig)
 SOC_MILL_CONFIG_PROP = -Dnpc.config=$(1)
 
@@ -71,7 +71,7 @@ SOC_CONFIG = verilog_config=$(SOC_VERILOG_SCALA_CONFIG),sim_config=$(SOC_SIM_SCA
 V_CONFIG_STAMP = $(V_FILE_FINAL).config
 SIM_V_CONFIG_STAMP = $(SIM_V_FILE_FINAL).config
 SCALA_FILES = $(shell find src/ ../fpga-harness/src/ysyxSoC -name "*.scala")
-CONFIG_SCALA_FILES = $(shell find ../configs/parameters ../configs/platform ../configs/ysyx ../configs/fpga -name "*.scala")
+CONFIG_SCALA_FILES = $(shell find ../configs/parameters ../configs/common ../configs/ysyx ../configs/fpga -name "*.scala")
 CONFIG_RESOURCE_FILES = $(shell find ../configs/resources -type f)
 # ysyxSoC 的 CPU wrapper 直接引用同级目录中的 NPC 核心与 FPGA 公共源码。
 # 将它们纳入生成依赖，避免 AXI 或核心改动后继续误用旧 Verilog。

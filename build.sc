@@ -86,8 +86,9 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   // 对 scpu.NpcCore 及 scpu.fpga 的引用。
   private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "main" / "scala"
   private val npcParameterSourcePath = millSourcePath / os.up / "configs" / "parameters"
+  private val commonConfigSourcePath = millSourcePath / os.up / "configs" / "common"
+  private val nemuConfigSourcePath = millSourcePath / os.up / "configs" / "nemu"
   private val npcConfigSourcePath = millSourcePath / os.up / "configs" / "npc"
-  private val ysyxParameterSourcePath = millSourcePath / os.up / "configs" / "platform"
   private val ysyxConfigSourcePath = millSourcePath / os.up / "configs" / "ysyx"
   private val fpgaConfigSourcePath = millSourcePath / os.up / "configs" / "fpga"
   private val npcFpgaCommonSourcePath = millSourcePath / os.up / "fpga-harness" / "src" / "common"
@@ -101,8 +102,9 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
     millSourcePath / "src",
     npcCoreSourcePath,
     npcParameterSourcePath,
+    commonConfigSourcePath,
+    nemuConfigSourcePath,
     npcConfigSourcePath,
-    ysyxParameterSourcePath,
     ysyxConfigSourcePath,
     fpgaConfigSourcePath,
     npcFpgaCommonSourcePath,
@@ -115,4 +117,25 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
     npcConfigResourcePath
   )
   def rocketModule = rocketchip
+}
+
+/** FPGA Config 与 ysyxSoC 在同一个 Mill 编译边界中检查，避免同一终端 Config 被
+  * SBT/Mill 以不同源码过滤规则重复定义。
+  */
+object ysyxsocTest extends ysyxSoCTest
+
+trait ysyxSoCTest
+  extends TestModule
+    with HasThisChisel
+    with TestModule.ScalaTest {
+  override def millSourcePath = pwd / os.up / "fpga-harness" / "test"
+  override def sources = Task.Sources(millSourcePath)
+  def ysyxSoCModule: ScalaModule = ysyxsoc
+  def chiselModule: Option[ScalaModule] = None
+  def chiselPluginJar: T[Option[PathRef]] = None
+  def chiselIvy: Option[Dep] = v.chiselIvy
+  def chiselPluginIvy: Option[Dep] = v.chiselPluginIvy
+  override def moduleDeps = super.moduleDeps ++ Seq(ysyxSoCModule)
+  override def ivyDeps = super.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.19")
+  override def defaultCommandName() = "test"
 }

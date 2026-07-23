@@ -8,7 +8,7 @@ import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
 
-/** Consume the core's FPGA-style serial event through NEMU's existing MMIO ABI. */
+/** Consume the core's FPGA-style serial event through NEMU's exact MMIO ABI. */
 class SimPutchSink extends BlackBox with HasBlackBoxInline {
   val io = IO(new Bundle {
     val clock = Input(Clock())
@@ -27,21 +27,22 @@ class SimPutchSink extends BlackBox with HasBlackBoxInline {
       |  input  [7:0] bits,
       |  output       ready
       |);
-      |  import "DPI-C" function void mmio_write_impl(
-      |    input int addr, input int len, input longint unsigned data
+      |  import "DPI-C" function void mmio_write_word(
+      |    input int addr, input int len, input int word_bytes,
+      |    input longint unsigned word_data, input byte unsigned strb
       |  );
       |
       |  assign ready = 1'b1;
       |  always @(posedge clock) begin
       |    if (!reset && valid)
-      |      mmio_write_impl(32'ha00003f8, 1, {56'b0, bits});
+      |      mmio_write_word(32'ha00003f8, 1, 4, {56'b0, bits}, 8'h01);
       |  end
       |endmodule
       |""".stripMargin
   )
 }
 
-/** Verilator-only APB memory backed by NEMU physical memory through DPI-C. */
+/** Verilator-only APB memory backed by NEMU physical memory through the XLEN DPI ABI. */
 class SimAPBDpiRam extends BlackBox with HasBlackBoxInline {
   val io = IO(new Bundle {
     val clock = Input(Clock())
@@ -65,12 +66,14 @@ class SimAPBDpiRam extends BlackBox with HasBlackBoxInline {
       |  output [31:0] in_prdata,
       |  output        in_pslverr
       |);
-      |  import "DPI-C" function void pmem_read_64(input int addr, output longint unsigned data);
-      |  import "DPI-C" function void pmem_write_64(input int addr, input longint unsigned data, input byte wstrb);
+      |  import "DPI-C" function void pmem_read_word(
+      |    input int addr, input int word_bytes, output longint unsigned data
+      |  );
+      |  import "DPI-C" function void pmem_write_word(
+      |    input int addr, input int word_bytes, input longint unsigned data, input byte unsigned strb
+      |  );
       |
       |  reg [63:0] read_data;
-      |  wire [63:0] write_data = in_paddr[2] ? {in_pwdata, 32'b0} : {32'b0, in_pwdata};
-      |  wire [7:0] write_strb = in_paddr[2] ? {in_pstrb, 4'b0} : {4'b0, in_pstrb};
       |
       |  // The APB setup phase starts the DPI access. The registered read result
       |  // is returned during the following APB access phase.
@@ -79,15 +82,15 @@ class SimAPBDpiRam extends BlackBox with HasBlackBoxInline {
       |      read_data <= 64'b0;
       |    end else if (in_psel && !in_penable) begin
       |      if (in_pwrite)
-      |        pmem_write_64(in_paddr, write_data, write_strb);
+      |        pmem_write_word(in_paddr, 4, {32'b0, in_pwdata}, in_pstrb);
       |      else
-      |        pmem_read_64(in_paddr, read_data);
+      |        pmem_read_word(in_paddr, 4, read_data);
       |    end
       |  end
       |
       |  assign in_pready = in_psel && in_penable;
       |  assign in_pslverr = 1'b0;
-      |  assign in_prdata = in_paddr[2] ? read_data[63:32] : read_data[31:0];
+      |  assign in_prdata = read_data[31:0];
       |endmodule
       |""".stripMargin
   )
@@ -142,11 +145,12 @@ class SimAPBDpiMmio extends BlackBox with HasBlackBoxInline {
       |  output [31:0] in_prdata,
       |  output        in_pslverr
       |);
-      |  import "DPI-C" function void mmio_read_impl(
-      |    input int addr, input int len, output longint unsigned data
+      |  import "DPI-C" function void mmio_read_word(
+      |    input int addr, input int len, input int word_bytes, output longint unsigned word_data
       |  );
-      |  import "DPI-C" function void mmio_write_impl(
-      |    input int addr, input int len, input longint unsigned data
+      |  import "DPI-C" function void mmio_write_word(
+      |    input int addr, input int len, input int word_bytes,
+      |    input longint unsigned word_data, input byte unsigned strb
       |  );
       |
       |  reg [63:0] read_data;
@@ -161,33 +165,55 @@ class SimAPBDpiMmio extends BlackBox with HasBlackBoxInline {
       |    end
       |  endfunction
       |
-      |  function automatic [31:0] low_lane_data(input [31:0] data, input [3:0] strb);
-      |    begin
-      |      case (strb)
-      |        4'b0010: low_lane_data = data >> 8;
-      |        4'b0100: low_lane_data = data >> 16;
-      |        4'b1000: low_lane_data = data >> 24;
-      |        4'b1100: low_lane_data = data >> 16;
-      |        default: low_lane_data = data;
-      |      endcase
-      |    end
-      |  endfunction
-      |
       |  // Start DPI work in APB setup; return the registered result in access.
       |  always @(posedge clock) begin
       |    if (reset) begin
       |      read_data <= 64'b0;
       |    end else if (in_psel && !in_penable) begin
       |      if (in_pwrite)
-      |        mmio_write_impl(in_paddr, access_len(in_pstrb), low_lane_data(in_pwdata, in_pstrb));
+      |        mmio_write_word(in_paddr, access_len(in_pstrb), 4, {32'b0, in_pwdata}, in_pstrb);
       |      else
-      |        mmio_read_impl(in_paddr, access_len(in_pstrb), read_data);
+      |        mmio_read_word(in_paddr, access_len(in_pstrb), 4, read_data);
       |    end
       |  end
       |
       |  assign in_pready = in_psel && in_penable;
       |  assign in_pslverr = 1'b0;
       |  assign in_prdata = read_data[31:0];
+      |endmodule
+      |""".stripMargin
+  )
+}
+
+/** Verilator-only conversion from a core memory fault into NEMU_ABORT. */
+class SimMemoryFaultSink extends BlackBox with HasBlackBoxInline {
+  val io = IO(new Bundle {
+    val clock = Input(Clock())
+    val reset = Input(Reset())
+    val valid = Input(Bool())
+    val addr = Input(UInt(32.W))
+    val write = Input(Bool())
+    val len = Input(UInt(4.W))
+    val reason = Input(UInt(3.W))
+  })
+
+  setInline(
+    "SimMemoryFaultSink.v",
+    """module SimMemoryFaultSink(
+      |  input clock, input reset, input valid, input [31:0] addr,
+      |  input write, input [3:0] len, input [2:0] reason
+      |);
+      |  reg reported;
+      |  import "DPI-C" function void memory_fault(
+      |    input int addr, input bit write, input int len, input int reason
+      |  );
+      |  always @(posedge clock) begin
+      |    if (reset) reported <= 1'b0;
+      |    else if (valid && !reported) begin
+      |      memory_fault(addr, write, len, reason);
+      |      reported <= 1'b1;
+      |    end
+      |  end
       |endmodule
       |""".stripMargin
   )

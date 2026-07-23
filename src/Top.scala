@@ -24,7 +24,7 @@ class ysyxSoCTop(implicit val parameters: Parameters) extends Module {
 }
 
 object Elaborate extends App {
-  val (entry, construction) = CdeConfigResolver.resolve("YsyxStandaloneConfig", Set("soc"))
+  val (entry, construction) = CdeConfigResolver.resolve("YsyxElaborateConfig", Set("soc"))
   println(s"正在生成 ysyxSoC Verilog... Config=${entry.className}")
   implicit val parameters: Parameters = construction
   val firtoolOptions = Array("--disable-annotation-unknown")

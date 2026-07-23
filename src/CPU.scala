@@ -46,7 +46,7 @@ class CPU(idBits: Int)(implicit p: Parameters) extends LazyModule {
     val slave = IO(Flipped(AXI4Bundle(CPUAXI4BundleParameters())))
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(IO(Decoupled(UInt(8.W)))) else None
-    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.isa.F) {
+    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.operators.routes.requiresHostFallback) {
       Some(IO(new ArithmeticAssistPort(32)))
     } else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(IO(new NpcDispatchControlPort)) else None
@@ -82,7 +82,7 @@ class ysyx_25120311(implicit val parameters: Parameters) extends Module {
     val io_slave = Flipped(AXI4Bundle(CPUAXI4BundleParameters()))
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(Output(NpcSoCDebugBundle())) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(Decoupled(UInt(8.W))) else None
-    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.isa.F) {
+    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.operators.routes.requiresHostFallback) {
       Some(new ArithmeticAssistPort(32))
     } else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(new NpcDispatchControlPort) else None
@@ -120,6 +120,16 @@ class ysyx_25120311(implicit val parameters: Parameters) extends Module {
       } else {
         putch.ready := true.B
       }
+    }
+    if (YsyxPlatformParameters.isDpiSimulation) {
+      val faultSink = Module(new SimMemoryFaultSink)
+      faultSink.io.clock := clock
+      faultSink.io.reset := reset
+      faultSink.io.valid := cpu.io.memoryFault.valid
+      faultSink.io.addr := cpu.io.memoryFault.addr
+      faultSink.io.write := cpu.io.memoryFault.write
+      faultSink.io.len := cpu.io.memoryFault.len
+      faultSink.io.reason := cpu.io.memoryFault.reason
     }
   }
 
