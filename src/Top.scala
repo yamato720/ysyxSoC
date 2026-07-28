@@ -4,7 +4,7 @@ import chisel3._
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.system._
 import freechips.rocketchip.diplomacy.LazyModule
-import _root_.scpu.fpga.CdeConfigResolver
+import _root_.npc.CdeConfigResolver
 
 class ysyxSoCTop(implicit val parameters: Parameters) extends Module {
 

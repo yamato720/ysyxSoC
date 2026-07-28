@@ -10,8 +10,8 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.amba.axi4._
 import freechips.rocketchip.amba.apb._
 import freechips.rocketchip.system.SimAXIMem
-import _root_.scpu.ISAConfig
-import _root_.scpu.protocol.{ArithmeticAssistPort, NpcDispatchControlPort}
+import _root_.npc.ISAConfig
+import _root_.npc.protocol.NpcDispatchControlPort
 import ysyx.YsyxPlatformParameters
 
 object AXI4SlaveNodeGenerator {
@@ -105,21 +105,9 @@ class ysyxSoCASIC(implicit p: Parameters) extends LazyModule {
     cpu.module.interrupt := intr_from_chipSlave
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
     val putch = if (useFpgaBackend) Some(IO(Decoupled(UInt(8.W)))) else None
-    val arithmeticAssist = if (useFpgaBackend && npcConfig.isa.F) {
-      Some(IO(new ArithmeticAssistPort(32)))
-    } else None
     val dispatchControl = if (useFpgaBackend) Some(IO(new NpcDispatchControlPort)) else None
     debug.foreach(_ := cpu.module.debug.get)
     (putch zip cpu.module.putch).foreach { case (external, source) => external <> source }
-    (arithmeticAssist zip cpu.module.arithmeticAssist).foreach { case (external, source) =>
-      external.request.valid := source.request.valid
-      external.request.bits := source.request.bits
-      source.request.ready := external.request.ready
-      source.response.valid := external.response.valid
-      source.response.bits := external.response.bits
-      external.response.ready := source.response.ready
-      external.busy := source.busy
-    }
     (dispatchControl zip cpu.module.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire

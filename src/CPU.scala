@@ -8,9 +8,8 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.amba.axi4._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
-import _root_.scpu.{ISAConfig, NpcCore, SimulationCoreComponents}
-import _root_.scpu.fpga.FpgaCoreComponents
-import _root_.scpu.protocol.{ArithmeticAssistPort, NpcCoreDebugBundle, NpcDispatchControlPort}
+import _root_.npc.{FpgaIpAttachmentKey, ISAConfig, NpcCore, NpcCoreComponents, SimulationCoreComponents}
+import _root_.npc.protocol.{NpcCoreDebugBundle, NpcDispatchControlPort}
 import ysyx.YsyxPlatformParameters
 
 object CPUAXI4BundleParameters {
@@ -46,9 +45,6 @@ class CPU(idBits: Int)(implicit p: Parameters) extends LazyModule {
     val slave = IO(Flipped(AXI4Bundle(CPUAXI4BundleParameters())))
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(IO(Decoupled(UInt(8.W)))) else None
-    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.operators.routes.requiresHostFallback) {
-      Some(IO(new ArithmeticAssistPort(32)))
-    } else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(IO(new NpcDispatchControlPort)) else None
 
     val cpu = Module(new ysyx_25120311)
@@ -57,15 +53,6 @@ class CPU(idBits: Int)(implicit p: Parameters) extends LazyModule {
     master <> cpu.io.io_master
     debug.foreach(_ := cpu.io.debug.get)
     (putch zip cpu.io.putch).foreach { case (external, source) => external <> source }
-    (arithmeticAssist zip cpu.io.arithmeticAssist).foreach { case (external, source) =>
-      external.request.valid := source.request.valid
-      external.request.bits := source.request.bits
-      source.request.ready := external.request.ready
-      source.response.valid := external.response.valid
-      source.response.bits := external.response.bits
-      external.response.ready := source.response.ready
-      external.busy := source.busy
-    }
     (dispatchControl zip cpu.io.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire
@@ -82,28 +69,18 @@ class ysyx_25120311(implicit val parameters: Parameters) extends Module {
     val io_slave = Flipped(AXI4Bundle(CPUAXI4BundleParameters()))
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(Output(NpcSoCDebugBundle())) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(Decoupled(UInt(8.W))) else None
-    val arithmeticAssist = if (YsyxPlatformParameters.isFpga && npcConfig.operators.routes.requiresHostFallback) {
-      Some(new ArithmeticAssistPort(32))
-    } else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(new NpcDispatchControlPort) else None
   })
 
   require(npcConfig.isa.xlen == 32, s"ysyxSoC requires XLEN=32, got ${npcConfig.isa.xlen}")
-  val components = if (YsyxPlatformParameters.isFpga) FpgaCoreComponents else SimulationCoreComponents
+  val components = parameters(FpgaIpAttachmentKey)
+    .map(attachment => NpcCoreComponents.externalArithmetic(attachment.name, attachment.arithmeticIp))
+    .getOrElse(SimulationCoreComponents)
   val cpu = Module(new NpcCore(npcConfig, components))
 
   cpu.io.interrupt := io.io_interrupt
   if (YsyxPlatformParameters.isFpga) {
     (io.putch zip cpu.io.putch).foreach { case (external, source) => external <> source }
-    (io.arithmeticAssist zip cpu.io.arithmeticAssist).foreach { case (external, source) =>
-      external.request.valid := source.request.valid
-      external.request.bits := source.request.bits
-      source.request.ready := external.request.ready
-      source.response.valid := external.response.valid
-      source.response.bits := external.response.bits
-      external.response.ready := source.response.ready
-      external.busy := source.busy
-    }
     (io.dispatchControl zip cpu.io.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire
