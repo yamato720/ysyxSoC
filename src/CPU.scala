@@ -10,6 +10,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
 import _root_.npc.{FpgaIpAttachmentKey, ISAConfig, NpcCore, NpcCoreComponents, SimulationCoreComponents}
 import _root_.npc.protocol.{NpcCoreDebugBundle, NpcDispatchControlPort}
+import _root_.npc.NpcCacheMaintenancePort
 import ysyx.YsyxPlatformParameters
 
 object CPUAXI4BundleParameters {
@@ -46,6 +47,9 @@ class CPU(idBits: Int)(implicit p: Parameters) extends LazyModule {
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(IO(Decoupled(UInt(8.W)))) else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(IO(new NpcDispatchControlPort)) else None
+    val cacheMaintenance = if (YsyxPlatformParameters.isFpga && npcConfig.cache.dcache.enabled) {
+      Some(IO(new NpcCacheMaintenancePort))
+    } else None
 
     val cpu = Module(new ysyx_25120311)
     cpu.io.io_interrupt := interrupt
@@ -56,6 +60,10 @@ class CPU(idBits: Int)(implicit p: Parameters) extends LazyModule {
     (dispatchControl zip cpu.io.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire
+    }
+    (cacheMaintenance zip cpu.io.cacheMaintenance).foreach { case (external, core) =>
+      core.drainRequest := external.drainRequest
+      external.drained := core.drained
     }
   }
 }
@@ -70,6 +78,9 @@ class ysyx_25120311(implicit val parameters: Parameters) extends Module {
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(Output(NpcSoCDebugBundle())) else None
     val putch = if (YsyxPlatformParameters.isFpga) Some(Decoupled(UInt(8.W))) else None
     val dispatchControl = if (YsyxPlatformParameters.isFpga) Some(new NpcDispatchControlPort) else None
+    val cacheMaintenance = if (YsyxPlatformParameters.isFpga && npcConfig.cache.dcache.enabled) {
+      Some(new NpcCacheMaintenancePort)
+    } else None
   })
 
   require(npcConfig.isa.xlen == 32, s"ysyxSoC requires XLEN=32, got ${npcConfig.isa.xlen}")
@@ -84,6 +95,10 @@ class ysyx_25120311(implicit val parameters: Parameters) extends Module {
     (io.dispatchControl zip cpu.io.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire
+    }
+    (io.cacheMaintenance zip cpu.io.cacheMaintenance).foreach { case (external, core) =>
+      core.drainRequest := external.drainRequest
+      external.drained := core.drained
     }
   } else {
     cpu.io.putch.foreach { putch =>

@@ -1,7 +1,8 @@
 V_FILE_GEN   = build/ysyxSoCTop.sv
 V_FILE_FINAL = build/ysyxSoCFull.v
-SIM_V_FILE_GEN   = build-sim/ysyxSoCTop.sv
-SIM_V_FILE_FINAL = build-sim/ysyxSoCFull.v
+SIM_BUILD_DIR ?= build-sim
+SIM_V_FILE_GEN   = $(SIM_BUILD_DIR)/ysyxSoCTop.sv
+SIM_V_FILE_FINAL = $(SIM_BUILD_DIR)/ysyxSoCFull.v
 ifneq ($(INTERNAL_CONSTRUCTION),1)
 $(error ysyxSoC Make 生成入口已内部化；请使用 make -C npc build config=<SoC或FPGA-SoC Config>)
 endif

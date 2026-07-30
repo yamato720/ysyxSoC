@@ -106,11 +106,18 @@ class ysyxSoCASIC(implicit p: Parameters) extends LazyModule {
     val debug = if (YsyxPlatformParameters.enableNpcDebug) Some(IO(Output(NpcSoCDebugBundle()))) else None
     val putch = if (useFpgaBackend) Some(IO(Decoupled(UInt(8.W)))) else None
     val dispatchControl = if (useFpgaBackend) Some(IO(new NpcDispatchControlPort)) else None
+    val cacheMaintenance = if (useFpgaBackend && YsyxPlatformParameters.npcCoreConfig.cache.dcache.enabled) {
+      Some(IO(new _root_.npc.NpcCacheMaintenancePort))
+    } else None
     debug.foreach(_ := cpu.module.debug.get)
     (putch zip cpu.module.putch).foreach { case (external, source) => external <> source }
     (dispatchControl zip cpu.module.dispatchControl).foreach { case (external, core) =>
       core.dispatchPermit := external.dispatchPermit
       external.dispatchFire := core.dispatchFire
+    }
+    (cacheMaintenance zip cpu.module.cacheMaintenance).foreach { case (external, core) =>
+      core.drainRequest := external.drainRequest
+      external.drained := core.drained
     }
 
     val sdramBundle = if (YsyxPlatformParameters.useAxiSdram) lsdram_axi.map(_.module.sdram_bundle)
