@@ -8,7 +8,10 @@ import _root_.npc.{CdeConfigResolver, ConstructionProfile, HostConstruction, Npc
 object DescribeConfig extends App {
   require(args.length == 1, "用法：ysyx.DescribeConfig <profile.env>")
   val (entry, construction) = CdeConfigResolver.resolve("", Set("soc"))
-  val metadata: HostConstruction = construction
+  val metadata: HostConstruction = construction match {
+    case host: HostConstruction => host
+    case _ => throw new IllegalArgumentException(s"${entry.className} 不是可运行 SoC 终端")
+  }
   implicit val parameters: Parameters = construction
   ConstructionProfile.write(
     Path.of(args(0)),
