@@ -98,7 +98,8 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   private val npcFpgaCommonSourcePath = npcFpgaRootPath / "common" / "scala" / "common"
   private val npcFpgaCoreSourcePath = npcFpgaRootPath / "common" / "scala" / "rv-core"
   private val npcFpgaSocSourcePath = npcFpgaRootPath / "common" / "scala" / "ysyxSoC"
-  private val npcFpgaSpmvSourcePath = npcFpgaRootPath / "common" / "scala" / "spmv"
+  private val npcFpgaSpmvSourcePath = npcFpgaRootPath / "common" / "scala" / "accelerator" / "spmv"
+  private val npcFpgaLegacySpmvSourcePath = npcFpgaRootPath / "common" / "scala" / "spmv"
   private val npcFpgaU55cSourcePath = npcFpgaRootPath / "u55c" / "scala"
   private val npcFpgaZcu102SourcePath = npcFpgaRootPath / "zcu102" / "scala"
   // NPC 核心使用的 DPI BlackBox 从当前模块的 classpath 查找资源，因此这里同时
@@ -121,6 +122,7 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
     npcFpgaCoreSourcePath,
     npcFpgaSocSourcePath,
     npcFpgaSpmvSourcePath,
+    npcFpgaLegacySpmvSourcePath,
     npcFpgaU55cSourcePath,
     npcFpgaZcu102SourcePath
   )
