@@ -83,52 +83,33 @@ object ysyxsoc extends ysyxSoC
 trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   override def millSourcePath = pwd
   // 将 NPC 核心与 FPGA 集成层编入同一个 BSP 目标，使 IDE 能解析 SoC wrapper
-  // 对 npc.NpcCore 及 npc.fpga 的引用。
-  private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "main" / "scala"
+  // 对 npc.NpcCore、fpga 共享层及各产品 FPGA 顶层的引用。
+  private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "scala"
   private val npcIpInterfaceSourcePath = millSourcePath / os.up / "ip-interface" / "scala"
-  private val npcParameterSourcePath = millSourcePath / os.up / "configs" / "parameters"
-  private val commonConfigSourcePath = millSourcePath / os.up / "configs" / "common"
-  private val nemuConfigSourcePath = millSourcePath / os.up / "configs" / "nemu"
-  private val npcConfigSourcePath = millSourcePath / os.up / "configs" / "npc"
-  private val ysyxConfigSourcePath = millSourcePath / os.up / "configs" / "ysyx"
-  private val fpgaConfigSourcePath = millSourcePath / os.up / "configs" / "fpga"
-  private val spmvConfigSourcePath = millSourcePath / os.up / "configs" / "spmv"
-  private val spmvAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "spmv" / "main" / "scala"
+  private val npcConfigSourcePath = millSourcePath / os.up / "configs"
+  private val commonAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "common" / "scala"
+  private val spmvAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "spmv" / "scala"
   private val npcFpgaRootPath = millSourcePath / os.up / os.up / "fpga"
-  private val npcFpgaCommonSourcePath = npcFpgaRootPath / "common" / "scala" / "common"
-  private val npcFpgaCoreSourcePath = npcFpgaRootPath / "common" / "scala" / "rv-core"
-  private val npcFpgaSocSourcePath = npcFpgaRootPath / "common" / "scala" / "ysyxSoC"
-  private val npcFpgaSpmvSourcePath = npcFpgaRootPath / "common" / "scala" / "accelerator" / "spmv"
-  private val npcFpgaLegacySpmvSourcePath = npcFpgaRootPath / "common" / "scala" / "spmv"
+  private val fpgaCommonSourcePath = npcFpgaRootPath / "common" / "scala"
   private val npcFpgaU55cSourcePath = npcFpgaRootPath / "u55c" / "scala"
   private val npcFpgaZcu102SourcePath = npcFpgaRootPath / "zcu102" / "scala"
-  // NPC 核心使用的 DPI BlackBox 从当前模块的 classpath 查找资源，因此这里同时
-  // 引入核心资源目录，保证 SoC 生成时仍能选择可选的 DPI 实现。
-  private val npcCoreResourcePath = millSourcePath / os.up / "rv-core" / "main" / "resources"
+  // DPI BlackBox 从当前模块的 classpath 查找资源，因此 Mill 直接复用
+  // ip-interface 的稳定资源根，不再保留不存在的 rv-core 资源路径。
+  private val npcIpResourcePath = millSourcePath / os.up / "ip-interface" / "resources"
   private val npcConfigResourcePath = millSourcePath / os.up / "configs" / "resources"
   override def sources = Task.Sources(
     millSourcePath / "src",
     npcCoreSourcePath,
     npcIpInterfaceSourcePath,
-    npcParameterSourcePath,
-    commonConfigSourcePath,
-    nemuConfigSourcePath,
     npcConfigSourcePath,
-    ysyxConfigSourcePath,
-    fpgaConfigSourcePath,
-    spmvConfigSourcePath,
+    commonAcceleratorSourcePath,
     spmvAcceleratorSourcePath,
-    npcFpgaCommonSourcePath,
-    npcFpgaCoreSourcePath,
-    npcFpgaSocSourcePath,
-    npcFpgaSpmvSourcePath,
-    npcFpgaLegacySpmvSourcePath,
+    fpgaCommonSourcePath,
     npcFpgaU55cSourcePath,
     npcFpgaZcu102SourcePath
   )
   override def resources = Task.Sources(
-    millSourcePath / "src" / "main" / "resources",
-    npcCoreResourcePath,
+    npcIpResourcePath,
     npcConfigResourcePath
   )
   def rocketModule = rocketchip
