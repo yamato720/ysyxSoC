@@ -125,7 +125,24 @@ trait ysyxSoCTest
     with HasThisChisel
     with TestModule.ScalaTest {
   override def millSourcePath = pwd / os.up / os.up / "fpga" / "common" / "test"
-  override def sources = Task.Sources(millSourcePath)
+  private val spmvCuperflowE1TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "input-mul" / "cuperflow"
+  private val spmvCuperflowE2TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "l1" / "cuperflow"
+  private val spmvCuperflowE3TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "l2" / "cuperflow"
+  // E1 ingress 是与现有 FPGA Config contract 同一 RTL 编译边界的一部分。显式列出
+  // E1/E2 的 ingress 与 epoch/result-slot 合同都处于同一 RTL 编译边界。显式列出
+  // 三份 Verilator contract test，避免把整个历史 SPMV test 目录意外变成 SoC 回归范围。
+  override def sources = Task.Sources(
+    millSourcePath,
+    spmvCuperflowE1TestPath / "SpmvCuperflowL1IngressPackerTest.scala",
+    spmvCuperflowE1TestPath / "SpmvCuperflowCompactIngressBridgeTest.scala",
+    spmvCuperflowE2TestPath / "SpmvCuperflowEpochIngressTest.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierStageTest.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierChainTest.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressBarrierTest.scala"
+  )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
   def chiselPluginJar: T[Option[PathRef]] = None
