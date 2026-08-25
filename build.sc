@@ -144,7 +144,8 @@ trait ysyxSoCTest
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierStageTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierChainTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressBarrierTest.scala",
-    spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala"
+    spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
+    spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
