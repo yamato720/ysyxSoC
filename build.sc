@@ -131,6 +131,8 @@ trait ysyxSoCTest
     "l1" / "cuperflow"
   private val spmvCuperflowE3TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "l2" / "cuperflow"
+  private val spmvCuperflowE4TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "pipeline" / "cuperflow"
   // E1 ingress 是与现有 FPGA Config contract 同一 RTL 编译边界的一部分。显式列出
   // E1/E2 的 ingress 与 epoch/result-slot 合同都处于同一 RTL 编译边界。显式列出
   // 三份 Verilator contract test，避免把整个历史 SPMV test 目录意外变成 SoC 回归范围。
@@ -141,7 +143,8 @@ trait ysyxSoCTest
     spmvCuperflowE2TestPath / "SpmvCuperflowEpochIngressTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierStageTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierChainTest.scala",
-    spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressBarrierTest.scala"
+    spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressBarrierTest.scala",
+    spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
