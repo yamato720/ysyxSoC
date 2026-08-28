@@ -147,6 +147,7 @@ trait ysyxSoCTest
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressBarrierScanTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressRendezvousTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochRendezvousChainTest.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowEpochIngressTaggedChainTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochRendezvousErrorTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowRendezvousIi1Test.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowL2LaneConfigTest.scala",
