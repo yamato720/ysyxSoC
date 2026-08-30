@@ -155,6 +155,7 @@ trait ysyxSoCTest
     spmvCuperflowE3TestPath / "SpmvCuperflowL2LaneConfigTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedDualTransportLaneTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedTerminalCompatTest.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowTaggedHeaderAdmissionTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
     spmvConfigTestPath / "SpmvInputConfigTest.scala"
