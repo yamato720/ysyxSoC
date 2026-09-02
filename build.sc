@@ -141,6 +141,7 @@ trait ysyxSoCTest
     millSourcePath,
     spmvCuperflowE1TestPath / "SpmvCuperflowL1IngressPackerTest.scala",
     spmvCuperflowE1TestPath / "SpmvCuperflowCompactIngressBridgeTest.scala",
+    spmvCuperflowE2TestPath / "SpmvCuperflowL1Test.scala",
     spmvCuperflowE2TestPath / "SpmvCuperflowEpochIngressTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierStageTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierChainTest.scala",
