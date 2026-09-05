@@ -127,10 +127,14 @@ trait ysyxSoCTest
   override def millSourcePath = pwd / os.up / os.up / "fpga" / "common" / "test"
   private val spmvCuperflowE1TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "input-mul" / "cuperflow"
+  private val spmvRowfoldInputTestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "input-mul" / "rowfold"
   private val spmvCuperflowE2TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "l1" / "cuperflow"
   private val spmvCuperflowE3TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "l2" / "cuperflow"
+  private val spmvCuperflowL2TreeTestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
+    "l2" / "cuperflow" / "tree"
   private val spmvCuperflowE4TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "pipeline" / "cuperflow"
   private val spmvConfigTestPath = pwd / os.up / "accelerators" / "spmv" / "test" / "config"
@@ -141,6 +145,7 @@ trait ysyxSoCTest
     millSourcePath,
     spmvCuperflowE1TestPath / "SpmvCuperflowL1IngressPackerTest.scala",
     spmvCuperflowE1TestPath / "SpmvCuperflowCompactIngressBridgeTest.scala",
+    spmvRowfoldInputTestPath / "SpmvRowfoldInputTopTest.scala",
     spmvCuperflowE2TestPath / "SpmvCuperflowL1Test.scala",
     spmvCuperflowE2TestPath / "SpmvCuperflowEpochIngressTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochBarrierStageTest.scala",
@@ -153,10 +158,12 @@ trait ysyxSoCTest
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedRightwardElasticLinkTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowEpochRendezvousErrorTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowRendezvousIi1Test.scala",
+    spmvCuperflowE3TestPath / "SpmvCuperflowFoldRoleRendezvousTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowL2LaneConfigTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedDualTransportLaneTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedTerminalCompatTest.scala",
     spmvCuperflowE3TestPath / "SpmvCuperflowTaggedHeaderAdmissionTest.scala",
+    spmvCuperflowL2TreeTestPath / "SpmvRowfoldL2Tree16Test.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
     spmvConfigTestPath / "SpmvInputConfigTest.scala"
