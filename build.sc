@@ -85,7 +85,7 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   // 将 NPC 核心与 FPGA 集成层编入同一个 BSP 目标，使 IDE 能解析 SoC wrapper
   // 对 npc.NpcCore、fpga 共享层及各产品 FPGA 顶层的引用。
   private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "scala"
-  private val npcIpInterfaceSourcePath = millSourcePath / os.up / "ip-interface" / "scala"
+  private val iprouterSourcePath = millSourcePath / os.up / "iprouter" / "scala"
   private val npcConfigSourcePath = millSourcePath / os.up / "configs"
   private val commonAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "common" / "scala"
   private val spmvAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "spmv" / "scala"
@@ -94,13 +94,13 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   private val npcFpgaU55cSourcePath = npcFpgaRootPath / "u55c" / "scala"
   private val npcFpgaZcu102SourcePath = npcFpgaRootPath / "zcu102" / "scala"
   // DPI BlackBox 从当前模块的 classpath 查找资源，因此 Mill 直接复用
-  // ip-interface 的稳定资源根，不再保留不存在的 rv-core 资源路径。
-  private val npcIpResourcePath = millSourcePath / os.up / "ip-interface" / "resources"
+  // iprouter 的稳定资源根，不再保留不存在的 rv-core 资源路径。
+  private val iprouterResourcePath = millSourcePath / os.up / "iprouter" / "resources"
   private val npcConfigResourcePath = millSourcePath / os.up / "configs" / "resources"
   override def sources = Task.Sources(
     millSourcePath / "src",
     npcCoreSourcePath,
-    npcIpInterfaceSourcePath,
+    iprouterSourcePath,
     npcConfigSourcePath,
     commonAcceleratorSourcePath,
     spmvAcceleratorSourcePath,
@@ -109,7 +109,7 @@ trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
     npcFpgaZcu102SourcePath
   )
   override def resources = Task.Sources(
-    npcIpResourcePath,
+    iprouterResourcePath,
     npcConfigResourcePath
   )
   def rocketModule = rocketchip
