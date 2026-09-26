@@ -142,7 +142,8 @@ trait ysyxSoCTest
   // E1/E2 的 ingress 与 epoch/result-slot 合同都处于同一 RTL 编译边界。显式列出
   // 显式列出 E1--E4 Verilator contract test，避免把整个历史 SPMV test 目录意外变成 SoC 回归范围。
   override def sources = Task.Sources(
-    millSourcePath,
+    millSourcePath / "FpgaConfigCompositionTest.scala",
+    millSourcePath / "SpmvMadHiSpmvFpgaConfigTest.scala",
     spmvCuperflowE1TestPath / "SpmvCuperflowL1IngressPackerTest.scala",
     spmvCuperflowE1TestPath / "SpmvCuperflowCompactIngressBridgeTest.scala",
     spmvRowfoldInputTestPath / "SpmvRowfoldInputTopTest.scala",
@@ -166,7 +167,7 @@ trait ysyxSoCTest
     spmvCuperflowL2TreeTestPath / "SpmvRowfoldL2Tree16Test.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
-    spmvConfigTestPath / "SpmvInputConfigTest.scala"
+    spmvConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
