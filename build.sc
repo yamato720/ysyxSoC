@@ -79,39 +79,173 @@ trait ysyxSoCModule extends ScalaModule {
   )
 }
 
+/** RTL 基础合同模块：只拥有可被 NPC、SPMV 和 SoC 复用的接口与基础 IP。 */
+trait RtlFoundationModule extends HasThisChisel {
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / os.up / "iprouter" / "scala"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "iprouter" / "resources"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(rocketchip)
+}
+
+/** NPC RTL 与 NPC 参数合同的独立构建边界。 */
+trait RtlNpcModule extends HasThisChisel {
+  def foundationModule: ScalaModule
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / os.up / "rv-core" / "scala",
+    pwd / os.up / "configs" / "common",
+    pwd / os.up / "configs" / "npc",
+    pwd / os.up / "configs" / "parameters"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "configs" / "resources"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(foundationModule, rocketchip)
+}
+
+/** SPMV RTL 与 accelerator 参数合同的独立构建边界。 */
+trait RtlSpmvModule extends HasThisChisel {
+  def foundationModule: ScalaModule
+  def npcModule: ScalaModule
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / os.up / "accelerators" / "common" / "scala",
+    pwd / os.up / "accelerators" / "spmv" / "scala",
+    pwd / os.up / "accelerators" / "spmv" / "mad-hispmv" / "scala",
+    pwd / os.up / "accelerators" / "spmv" / "hispmv" / "scala",
+    pwd / os.up / "accelerators" / "spmv" / "cuperflow" / "scala",
+    pwd / os.up / "configs" / "accelerators" / "spmv"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "configs" / "resources"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(foundationModule, npcModule, rocketchip)
+}
+
+/** SoC RTL 的独立构建边界，只向下依赖 NPC、SPMV 和基础合同。 */
+trait RtlSocModule extends HasThisChisel {
+  def foundationModule: ScalaModule
+  def npcModule: ScalaModule
+  def spmvModule: ScalaModule
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / "src",
+    pwd / os.up / "configs" / "ysyx"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "configs" / "resources"
+  )
+  override def moduleDeps = super.moduleDeps ++
+    Seq(foundationModule, npcModule, spmvModule, rocketchip)
+}
+
+/** RTL 到后端的稳定接口，不携带 Vivado、Verilator 或 ASIC 工具实现。 */
+trait TargetContractModule extends HasThisChisel {
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / "target-contract" / "scala"
+  )
+}
+
+/** Verilator、FPGA 和 ASIC 共享的后端模块入口。 */
+trait TargetBackendModule extends HasThisChisel {
+  def rtlModule: ScalaModule
+  def targetContractModule: ScalaModule
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / "target-backends" / "scala"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(rtlModule, targetContractModule)
+}
+
+/** Verilator 后端只提供通用 SoC elaborator，不携带 FPGA shell。 */
+trait VerilatorTargetModule extends TargetBackendModule {
+  override def sources = Task.Sources(
+    pwd / "target-backends" / "verilator" / "scala",
+    pwd / os.up / "configs" / "fpga" / "CdeConfigResolver.scala",
+    pwd / os.up / "configs" / "fpga" / "base",
+    pwd / os.up / "configs" / "common" / "core" / "FpgaToolchainConfig.scala",
+    pwd / os.up / os.up / "fpga" / "common" / "scala" / "fpga" / "FpgaPlatformSettings.scala"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(rtlModule)
+}
+
+/** FPGA 后端还拥有板卡 shell 与工具链 Config，仍通过统一 target contract 接入。 */
+trait FpgaTargetModule extends TargetBackendModule {
+  override def sources = Task.Sources(
+    pwd / os.up / os.up / "fpga" / "common" / "scala",
+    pwd / os.up / os.up / "fpga" / "u55c" / "scala",
+    pwd / os.up / os.up / "fpga" / "zcu102" / "scala",
+    pwd / os.up / "configs" / "fpga"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "configs" / "resources"
+  )
+}
+
+/** 构造描述器和 profile writer，独立于 RTL 设计本身。 */
+trait ConstructionToolsModule extends HasThisChisel {
+  def rtlModule: ScalaModule
+  def fpgaModule: ScalaModule
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / "construction-tools" / "scala"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(rtlModule, fpgaModule, rocketchip)
+}
+
+object rtlFoundation extends RtlFoundationModule
+object rtlNpc extends RtlNpcModule {
+  def foundationModule = rtlFoundation
+}
+object rtlSpmv extends RtlSpmvModule {
+  def foundationModule = rtlFoundation
+  def npcModule = rtlNpc
+}
+object rtlSoc extends RtlSocModule {
+  def foundationModule = rtlFoundation
+  def npcModule = rtlNpc
+  def spmvModule = rtlSpmv
+}
+object targetContract extends TargetContractModule
+object targetVerilator extends VerilatorTargetModule {
+  def rtlModule = rtlSoc
+  def targetContractModule = targetContract
+}
+object targetFpga extends FpgaTargetModule {
+  def rtlModule = rtlSoc
+  def targetContractModule = targetContract
+}
+object targetAsic extends TargetBackendModule {
+  override def sources = Task.Sources(
+    pwd / "target-backends" / "asic" / "scala",
+    pwd / os.up / "configs" / "asic"
+  )
+  override def resources = Task.Sources(
+    pwd / os.up / "configs" / "resources"
+  )
+  def rtlModule = rtlSoc
+  def targetContractModule = targetContract
+}
+object constructionTools extends ConstructionToolsModule {
+  def rtlModule = rtlSoc
+  def fpgaModule = targetFpga
+  override def moduleDeps = super.moduleDeps ++ Seq(targetAsic)
+}
+
 object ysyxsoc extends ysyxSoC
 trait ysyxSoC extends ysyxSoCModule with HasThisChisel {
   override def millSourcePath = pwd
-  // 将 NPC 核心与 FPGA 集成层编入同一个 BSP 目标，使 IDE 能解析 SoC wrapper
-  // 对 npc.NpcCore、fpga 共享层及各产品 FPGA 顶层的引用。
-  private val npcCoreSourcePath = millSourcePath / os.up / "rv-core" / "scala"
-  private val iprouterSourcePath = millSourcePath / os.up / "iprouter" / "scala"
-  private val npcConfigSourcePath = millSourcePath / os.up / "configs"
-  private val commonAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "common" / "scala"
-  private val spmvAcceleratorSourcePath = millSourcePath / os.up / "accelerators" / "spmv" / "scala"
-  private val npcFpgaRootPath = millSourcePath / os.up / os.up / "fpga"
-  private val fpgaCommonSourcePath = npcFpgaRootPath / "common" / "scala"
-  private val npcFpgaU55cSourcePath = npcFpgaRootPath / "u55c" / "scala"
-  private val npcFpgaZcu102SourcePath = npcFpgaRootPath / "zcu102" / "scala"
-  // DPI BlackBox 从当前模块的 classpath 查找资源，因此 Mill 直接复用
-  // iprouter 的稳定资源根，不再保留不存在的 rv-core 资源路径。
-  private val iprouterResourcePath = millSourcePath / os.up / "iprouter" / "resources"
-  private val npcConfigResourcePath = millSourcePath / os.up / "configs" / "resources"
-  override def sources = Task.Sources(
-    millSourcePath / "src",
-    npcCoreSourcePath,
-    iprouterSourcePath,
-    npcConfigSourcePath,
-    commonAcceleratorSourcePath,
-    spmvAcceleratorSourcePath,
-    fpgaCommonSourcePath,
-    npcFpgaU55cSourcePath,
-    npcFpgaZcu102SourcePath
-  )
-  override def resources = Task.Sources(
-    iprouterResourcePath,
-    npcConfigResourcePath
-  )
+  // 聚合入口只连接分层模块；各模块拥有自己的源码和资源边界。
+  override def sources = Task.Sources()
+  override def resources = Task.Sources()
+  // ASIC 与 FPGA 在 Scala 聚合入口中并列；具体 Yosys 工具由 npc/asic 侧 runner 调用。
+  override def moduleDeps = super.moduleDeps ++
+    Seq(rtlSoc, targetVerilator, targetFpga, targetAsic, constructionTools)
   def rocketModule = rocketchip
 }
 
@@ -125,19 +259,16 @@ trait ysyxSoCTest
     with HasThisChisel
     with TestModule.ScalaTest {
   override def millSourcePath = pwd / os.up / os.up / "fpga" / "common" / "test"
-  private val spmvCuperflowE1TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
-    "input-mul" / "cuperflow"
+  private val spmvCuperflowTestRoot = pwd / os.up / "accelerators" / "spmv" / "cuperflow" / "test"
+  private val spmvCuperflowE1TestPath = spmvCuperflowTestRoot / "input-mul"
   private val spmvRowfoldInputTestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
     "input-mul" / "rowfold"
-  private val spmvCuperflowE2TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
-    "l1" / "cuperflow"
-  private val spmvCuperflowE3TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
-    "l2" / "cuperflow"
-  private val spmvCuperflowL2TreeTestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
-    "l2" / "cuperflow" / "tree"
-  private val spmvCuperflowE4TestPath = pwd / os.up / "accelerators" / "spmv" / "test" /
-    "pipeline" / "cuperflow"
+  private val spmvCuperflowE2TestPath = spmvCuperflowTestRoot / "l1"
+  private val spmvCuperflowE3TestPath = spmvCuperflowTestRoot / "l2"
+  private val spmvCuperflowL2TreeTestPath = spmvCuperflowTestRoot / "l2" / "tree"
+  private val spmvCuperflowE4TestPath = spmvCuperflowTestRoot / "pipeline"
   private val spmvConfigTestPath = pwd / os.up / "accelerators" / "spmv" / "test" / "config"
+  private val spmvMadConfigTestPath = pwd / os.up / "accelerators" / "spmv" / "mad-hispmv" / "test" / "config"
   // E1 ingress 是与现有 FPGA Config contract 同一 RTL 编译边界的一部分。显式列出
   // E1/E2 的 ingress 与 epoch/result-slot 合同都处于同一 RTL 编译边界。显式列出
   // 显式列出 E1--E4 Verilator contract test，避免把整个历史 SPMV test 目录意外变成 SoC 回归范围。
@@ -167,7 +298,7 @@ trait ysyxSoCTest
     spmvCuperflowL2TreeTestPath / "SpmvRowfoldL2Tree16Test.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
-    spmvConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala"
+    spmvMadConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
