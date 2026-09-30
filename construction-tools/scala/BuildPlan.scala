@@ -3,12 +3,12 @@ package ysyx
 import java.nio.file.Path
 
 import org.chipsalliance.cde.config.Parameters
-import _root_.npc.{BuildProfileProvider, CdeConfigResolver, ConstructionProfile}
+import _root_.npc.{BuildProfileProvider, CdeConfigResolver, ConfigCatalog, ConstructionProfile}
 
 /** 调用终端自己的投影，公共入口只验证字段合同。 */
 object DescribeBuildPlan extends App {
   require(args.length == 1, "用法：ysyx.DescribeBuildPlan <profile.env>")
-  val (entry, construction) = CdeConfigResolver.resolve("", Set("spmv", "fpga", "asic"))
+  val (entry, construction) = CdeConfigResolver.resolve("", ConfigCatalog.entries.map(_.scope).toSet)
   val provider = construction match {
     case value: BuildProfileProvider => value
     case _ => throw new IllegalArgumentException(s"${entry.className} 未提供 build profile")
