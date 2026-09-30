@@ -126,7 +126,17 @@ trait RtlSpmvModule extends HasThisChisel {
   override def moduleDeps = super.moduleDeps ++ Seq(foundationModule, npcModule, rocketchip)
 }
 
-/** SoC RTL 的独立构建边界，只向下依赖 NPC、SPMV 和基础合同。 */
+/** PCG 产品独立拥有 RTL 和参数，不依赖 SPMV 产品实现。 */
+object rtlPcg extends HasThisChisel {
+  override def millSourcePath = pwd
+  override def sources = Task.Sources(
+    pwd / os.up / "accelerators" / "pcg-accelerator" / "scala",
+    pwd / os.up / "configs" / "accelerators" / "pcg"
+  )
+  override def moduleDeps = super.moduleDeps ++ Seq(rtlFoundation, rtlNpc, rocketchip)
+}
+
+/** SoC 聚合边界向下连接 NPC、SPMV、PCG 和基础合同。 */
 trait RtlSocModule extends HasThisChisel {
   def foundationModule: ScalaModule
   def npcModule: ScalaModule
@@ -140,7 +150,7 @@ trait RtlSocModule extends HasThisChisel {
     pwd / os.up / "configs" / "resources"
   )
   override def moduleDeps = super.moduleDeps ++
-    Seq(foundationModule, npcModule, spmvModule, rocketchip)
+    Seq(foundationModule, npcModule, spmvModule, rtlPcg, rocketchip)
 }
 
 /** RTL 到后端的稳定接口，不携带 Vivado、Verilator 或 ASIC 工具实现。 */
@@ -298,7 +308,8 @@ trait ysyxSoCTest
     spmvCuperflowL2TreeTestPath / "SpmvRowfoldL2Tree16Test.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
-    spmvMadConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala"
+    spmvMadConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala",
+    pwd / os.up / "accelerators" / "pcg-accelerator" / "test"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc
   def chiselModule: Option[ScalaModule] = None
