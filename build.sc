@@ -116,9 +116,11 @@ trait RtlSpmvModule extends HasThisChisel {
     pwd / os.up / "accelerators" / "common" / "scala",
     pwd / os.up / "accelerators" / "spmv" / "scala",
     pwd / os.up / "accelerators" / "spmv" / "mad-hispmv" / "scala",
+    pwd / os.up / "accelerators" / "bggs" / "scala",
     pwd / os.up / "accelerators" / "spmv" / "hispmv" / "scala",
     pwd / os.up / "accelerators" / "spmv" / "cuperflow" / "scala",
-    pwd / os.up / "configs" / "accelerators" / "spmv"
+    pwd / os.up / "configs" / "accelerators" / "spmv",
+    pwd / os.up / "configs" / "accelerators" / "bggs"
   )
   override def resources = Task.Sources(
     pwd / os.up / "configs" / "resources"
@@ -309,6 +311,7 @@ trait ysyxSoCTest
     spmvCuperflowE4TestPath / "SpmvCuperflowEpochPipeline16PcTopTest.scala",
     spmvCuperflowE4TestPath / "SpmvCuperflowE4LocalMetadataBridgeTest.scala",
     spmvMadConfigTestPath / "SpmvMadHiSpmvTapaConfigTest.scala",
+    pwd / os.up / "accelerators" / "bggs" / "test",
     pwd / os.up / "accelerators" / "pcg-accelerator" / "test"
   )
   def ysyxSoCModule: ScalaModule = ysyxsoc

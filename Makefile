@@ -76,7 +76,7 @@ CONFIG_SCALA_FILES = $(shell find ../configs -name "*.scala")
 CONFIG_RESOURCE_FILES = $(shell find ../configs/resources -type f)
 # ysyxSoC 的 CPU wrapper 直接引用同级目录中的 NPC 核心与 FPGA 公共源码。
 # 将它们纳入生成依赖，避免 AXI 或核心改动后继续误用旧 Verilog。
-NPC_SCALA_FILES = $(shell find ../rv-core/scala ../accelerators/common/scala ../accelerators/spmv/scala -name "*.scala")
+NPC_SCALA_FILES = $(shell find ../rv-core/scala ../accelerators/common/scala ../accelerators/spmv/scala ../accelerators/bggs/scala -name "*.scala")
 NPC_RESOURCE_FILES = $(shell find ../iprouter/resources -type f)
 
 # Firtool 版本
